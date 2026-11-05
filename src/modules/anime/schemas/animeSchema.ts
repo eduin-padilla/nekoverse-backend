@@ -1,6 +1,5 @@
 
 import { z } from "zod";
-
 const currentYear = new Date().getFullYear();
 
 export const createAnimeSchema = z.object({
@@ -27,4 +26,32 @@ export const createAnimeSchema = z.object({
   isPublished: z.boolean().default(false),
 });
 
+
+export const getAnimesQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(12),
+  search: z.string().trim().max(150).optional(),
+  genre: z.string().trim().optional(),
+  status: z.enum(["upcoming", "airing", "completed"]).optional(),
+  type: z.enum(["TV", "Movie", "OVA", "ONA", "Special"]).optional(),
+});
+
+export const updateAnimeSchema = createAnimeSchema
+  .omit({ isPublished: true })
+  .extend({
+    titleEnglish: z.string().trim().max(150).nullable().optional(),
+    titleJapanese: z.string().trim().max(150).nullable().optional(),
+    studios: z.array(z.string().trim().min(1)).max(20).optional(),
+  })
+  .partial()
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "Debes proporcionar al menos un campo para actualizar",
+  });
+
+export const bulkPublishAnimeSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1, "Selecciona al menos un anime").max(50),
+});
+
+
+export type UpdateAnimeInput = z.infer<typeof updateAnimeSchema>;
 export type CreateAnimeInput = z.infer<typeof createAnimeSchema>;
