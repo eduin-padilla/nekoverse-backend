@@ -20,9 +20,9 @@ const envSchema = z.object({
     .url()
     .default("http://localhost:5173"),
 
-  MONGODB_URI: z
-    .string()
-    .min(1, "MONGODB_URI es obligatoria"),
+  MONGODB_URI: z.string().min(1, "MONGODB_URI es obligatoria").refine((value) => value.startsWith("mongodb://") || value.startsWith("mongodb+srv://"), "MONGODB_URI debe ser una URI válida de MongoDB"),
+  
+    TENRAI_BASE_URL: z.string().url().default("https://api.tenrai.org/v1"),
 });
 
 const result = envSchema.safeParse(process.env);
