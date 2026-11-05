@@ -11,12 +11,31 @@ export interface NormalizedAnime {
   bannerUrl: string;
   episodes: number | null;
   score: number | null;
-  year: number | null;
-  type: string | null;
-  status: string;
+  releaseYear: number | null;
+  type: "TV" | "Movie" | "OVA" | "ONA" | "Special";
+  status: "upcoming" | "airing" | "completed";
   genres: string[];
   studios: string[];
   externalUrl: string;
+}
+
+function mapAnimeStatus(status: string): NormalizedAnime["status"] {
+  const normalizedStatus = status.toLowerCase();
+  if (normalizedStatus.includes("not yet aired")) return "upcoming";
+  if (normalizedStatus.includes("finished airing")) return "completed";
+  if (normalizedStatus.includes("currently airing")) return "airing";
+  return "completed";
+}
+
+function mapAnimeType(type: string | null): NormalizedAnime["type"] {
+  const normalizedType = type?.toUpperCase();
+
+  if (normalizedType === "MOVIE") return "Movie";
+  if (normalizedType === "OVA") return "OVA";
+  if (normalizedType === "ONA") return "ONA";
+  if (normalizedType === "SPECIAL") return "Special";
+
+  return "TV";
 }
 
 export function mapTenraiAnime(anime: TenraiAnime): NormalizedAnime {
@@ -31,9 +50,9 @@ export function mapTenraiAnime(anime: TenraiAnime): NormalizedAnime {
     bannerUrl: anime.images.jpg.large_image_url,
     episodes: anime.episodes,
     score: anime.score,
-    year: anime.year,
-    type: anime.type,
-    status: anime.status,
+    releaseYear: anime.year,
+    type: mapAnimeType(anime.type),
+    status: mapAnimeStatus(anime.status),
     genres: anime.genres.map((genre) => genre.name),
     studios: anime.studios.map((studio) => studio.name),
     externalUrl: anime.url
