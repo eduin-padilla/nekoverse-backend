@@ -1,4 +1,28 @@
+# Dependencias
 node_modules/
+
+# Compilación
 dist/
+build/
+
+# Variables de entorno
 .env
+.env.*
+!.env.example
+
+# Cobertura de pruebas
 coverage/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
