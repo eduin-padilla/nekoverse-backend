@@ -8,11 +8,13 @@ const userSchema = new Schema(
     role: { type: String, enum: ["user", "admin"], default: "user", required: true },
     isActive: { type: Boolean, default: true, required: true },
     avatarUrl: { type: String, default: "" },
+    tokenVersion: { type: Number, default: 0, required: true },
   },
   { timestamps: true, versionKey: false }
 );
 
 userSchema.index({ username: 1 }, { unique: true });
+
 
 export type User = InferSchemaType<typeof userSchema>;
 export const UserModel = model("User", userSchema);

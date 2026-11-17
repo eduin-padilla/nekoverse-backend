@@ -10,11 +10,6 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
-interface JwtPayload {
-  sub: string;
-  role: "user" | "admin";
-}
-
 export async function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   try {
     const authorization = req.headers.authorization;
@@ -35,17 +30,21 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
       return res.status(401).json({ success: false, message: "Token inválido" });
     }
 
-    const user = await UserModel.findById(decoded.sub).select("_id role isActive");
+    if (typeof decoded.tokenVersion !== "number" || !Number.isInteger(decoded.tokenVersion)) {
+      return res.status(401).json({ success: false, message: "Token inválido" });
+    }
+
+    const user = await UserModel.findById(decoded.sub).select("_id role isActive tokenVersion");
 
     if (!user || !user.isActive) {
       return res.status(401).json({ success: false, message: "Usuario inexistente o inactivo" });
     }
 
-    req.user = {
-      id: user._id.toString(),
-      role: user.role as "user" | "admin"
-    };
+    if (user.tokenVersion !== decoded.tokenVersion) {
+      return res.status(401).json({ success: false, message: "La sesión ha expirado. Inicia sesión nuevamente" });
+    }
 
+    req.user = { id: user._id.toString(), role: user.role as "user" | "admin" };
     next();
   } catch {
     return res.status(401).json({ success: false, message: "Token inválido o expirado" });
