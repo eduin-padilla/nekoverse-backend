@@ -7,7 +7,13 @@ import {
 } from "./database/mongodb.js";
 
 async function startServer(): Promise<void> {
-  await connectMongoDB();
+  try {
+    await connectMongoDB();
+  } catch {
+    console.error("Hubo un error al conectar a la base de datos.");
+    process.exitCode = 1;
+    return;
+  }
 
   const server = app.listen(env.PORT, () => {
     console.log(

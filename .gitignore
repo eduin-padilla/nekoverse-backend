@@ -1,9 +1,11 @@
 # Dependencias
 node_modules/
+.pnpm-store/
 
 # Compilación
 dist/
 build/
+*.tsbuildinfo
 
 # Variables de entorno
 .env

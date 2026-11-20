@@ -5,6 +5,20 @@ import type { ChangePasswordInput, LoginInput, RegisterInput, UpdateProfileInput
 import { env } from "../../../config/env.js";
 
 const SALT_ROUNDS = 12;
+const SESSION_EXPIRED = "La sesión ha expirado. Inicia sesión nuevamente";
+
+function userConflict() {
+  return Object.assign(new Error("El correo o nombre de usuario ya está registrado"), { statusCode: 409 });
+}
+
+function rethrowUserWriteError(error: unknown): never {
+  if (typeof error === "object" && error !== null && "code" in error && error.code === 11000 &&
+      "keyPattern" in error && typeof error.keyPattern === "object" && error.keyPattern !== null) {
+    const keys = Object.keys(error.keyPattern);
+    if (keys.length === 1 && (keys[0] === "username" || keys[0] === "email")) throw userConflict();
+  }
+  throw error;
+}
 
 export async function registerUser(data: RegisterInput) {
   const existingUser = await UserModel.findOne({
@@ -12,7 +26,7 @@ export async function registerUser(data: RegisterInput) {
   });
 
   if (existingUser) {
-    throw Object.assign(new Error("El correo o nombre de usuario ya está registrado"), { statusCode: 409 });
+    throw userConflict();
   }
 
   const hashedPassword = await bcrypt.hash(data.password, SALT_ROUNDS);
@@ -22,7 +36,7 @@ export async function registerUser(data: RegisterInput) {
     email: data.email,
     password: hashedPassword,
     role: "user"
-  });
+  }).catch(rethrowUserWriteError);
 
   return {
     id: user._id,
@@ -71,23 +85,25 @@ export async function updateUserProfile(userId: string, data: UpdateProfileInput
     ]
   });
 
-  if (existingUser) throw Object.assign(new Error("El correo o nombre de usuario ya está registrado"), { statusCode: 409 });
+  if (existingUser) throw userConflict();
 
   if (data.username !== undefined) user.username = data.username;
   if (data.email !== undefined) user.email = data.email;
 
-  await user.save();
+  await user.save().catch(rethrowUserWriteError);
 
   return { id: user._id, username: user.username, email: user.email, role: user.role, avatarUrl: user.avatarUrl };
 }
 
-export async function changeUserPassword(userId: string, data: ChangePasswordInput) {
+export async function changeUserPassword(userId: string, tokenVersion: number, data: ChangePasswordInput) {
 
   const user = await UserModel.findById(userId).select("+password");
 
   if (!user || !user.isActive) {
     throw Object.assign(new Error("Usuario no encontrado"), { statusCode: 404 });
   }
+
+  if (user.tokenVersion !== tokenVersion) throw Object.assign(new Error(SESSION_EXPIRED), { statusCode: 401 });
 
   const passwordMatches = await bcrypt.compare(data.currentPassword, user.password);
 
@@ -97,22 +113,23 @@ export async function changeUserPassword(userId: string, data: ChangePasswordInp
 
   const hashedPassword = await bcrypt.hash(data.newPassword, SALT_ROUNDS);
 
-  user.password = hashedPassword;
-  user.tokenVersion += 1;
-  await user.save();
+  const result = await UserModel.updateOne(
+    { _id: userId, isActive: true, tokenVersion },
+    { $set: { password: hashedPassword }, $inc: { tokenVersion: 1 } }
+  ).exec();
+  if (result.matchedCount === 0) throw Object.assign(new Error(SESSION_EXPIRED), { statusCode: 401 });
 
   return { message: "Contraseña actualizada correctamente" };
 }
 
-export async function logoutUser(userId: string) {
-  const user = await UserModel.findOneAndUpdate(
-    { _id: userId, isActive: true },
-    { $inc: { tokenVersion: 1 } },
-    { new: true }
-  );
+export async function logoutUser(userId: string, tokenVersion: number) {
+  const result = await UserModel.updateOne(
+    { _id: userId, isActive: true, tokenVersion },
+    { $inc: { tokenVersion: 1 } }
+  ).exec();
 
-  if (!user) {
-    throw Object.assign(new Error("Usuario no encontrado"), { statusCode: 404 });
+  if (result.matchedCount === 0) {
+    throw Object.assign(new Error(SESSION_EXPIRED), { statusCode: 401 });
   }
 
   return { message: "Sesión cerrada correctamente" };
